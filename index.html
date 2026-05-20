@@ -41,7 +41,7 @@
     }
     .toast {
       position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-20px);
-      width: min(92vw, 520px); z-index: 9999; opacity: 0; pointer-events: none;
+      width: min(92vw, 560px); z-index: 9999; opacity: 0; pointer-events: none;
       padding: 14px 16px; border-radius: 18px;
       background: rgba(22, 163, 74, .94); color: white; font-weight: 800;
       box-shadow: 0 18px 40px rgba(0,0,0,.35); transition: .25s;
@@ -87,10 +87,7 @@
       border: 1px solid rgba(255,255,255,.12);
     }
     .progress-box p, .analysis-box p, .saved-panel p { color: #dbeafe; line-height: 1.65; margin-bottom: 8px; font-size: 14px; }
-    .saved-panel {
-      background: rgba(22, 163, 74, .13);
-      border: 1px solid rgba(74, 222, 128, .35);
-    }
+    .saved-panel { background: rgba(22, 163, 74, .13); border: 1px solid rgba(74, 222, 128, .35); }
     .saved-panel h3 { color:#bbf7d0; font-size:16px; margin-bottom: 6px; }
     .bar { height: 10px; background: rgba(255,255,255,.12); border-radius: 999px; overflow: hidden; }
     .bar div { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width .2s; }
@@ -107,7 +104,7 @@
     .list { display:grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap:14px; margin-top:14px; }
     .material { border-radius:20px; background:rgba(15,23,42,.72); border:1px solid rgba(255,255,255,.13); overflow:hidden; }
     .material.new-saved { outline: 2px solid rgba(74,222,128,.8); box-shadow: 0 0 0 5px rgba(34,197,94,.12); }
-    .material img { width:100%; height:170px; object-fit:cover; background:#020617; border-bottom:1px solid rgba(255,255,255,.1); }
+    .material img { width:100%; height:170px; object-fit:cover; background:#020617; border-bottom:1px solid rgba(255,255,255,.1); cursor: zoom-in; }
     .material-body { padding:15px; }
     .material h3 { font-size:17px; margin-bottom:8px; }
     .material p { color:#cbd5e1; font-size:13.5px; line-height:1.58; margin-bottom:6px; }
@@ -117,20 +114,76 @@
     .subject-bars { margin-top:16px; }
     .subject-row { margin-bottom:11px; }
     .subject-row p { display:flex; justify-content:space-between; color:#cbd5e1; font-size:13px; margin-bottom:6px; }
+
+    .viewer {
+      position: fixed; inset: 0; z-index: 9998; display: none;
+      background: rgba(2,6,23,.96); color: white;
+    }
+    .viewer.show { display: block; }
+    .viewer-toolbar {
+      position: absolute; top: max(10px, env(safe-area-inset-top)); left: 10px; right: 10px; z-index: 3;
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding: 10px; border-radius: 18px; background: rgba(15,23,42,.78); border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(14px);
+    }
+    .viewer-toolbar button { padding: 9px 11px; font-size: 13px; }
+    .viewer-title { color:#dbeafe; font-size: 13px; margin-right: auto; font-weight: 800; }
+    .viewer-stage {
+      position: absolute; inset: 0; overflow: hidden; touch-action: none;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .image-layer {
+      position: relative; transform-origin: center center;
+      touch-action: none; will-change: transform;
+    }
+    .viewer-img { display:block; max-width: 92vw; max-height: 82vh; user-select: none; -webkit-user-drag: none; border-radius: 12px; }
+    .draw-canvas { position:absolute; left:0; top:0; width:100%; height:100%; touch-action:none; }
+    .pen-active .draw-canvas { cursor: crosshair; }
+    .hint {
+      position:absolute; bottom:max(12px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+      background:rgba(15,23,42,.75); border:1px solid rgba(255,255,255,.12);
+      border-radius:999px; padding:9px 13px; color:#cbd5e1; font-size:12.5px;
+      z-index:3; text-align:center; max-width:92vw;
+    }
     @media (max-width: 900px) {
       body { padding: 13px; }
       .grid, .form-grid, .action-row, .filters, .choice-grid { grid-template-columns: 1fr; }
       .card { padding: 17px; border-radius: 20px; }
+      .viewer-toolbar { gap: 6px; }
+      .viewer-toolbar button { padding: 8px 9px; font-size: 12px; }
+      .viewer-title { width: 100%; margin-bottom: 2px; }
     }
   </style>
 </head>
 
 <body>
   <div class="toast" id="toast">저장 완료</div>
+
+  <div class="viewer" id="viewer">
+    <div class="viewer-toolbar">
+      <div class="viewer-title" id="viewerTitle">이미지 보기</div>
+      <button onclick="zoomViewer(0.2)">확대</button>
+      <button onclick="zoomViewer(-0.2)">축소</button>
+      <button class="secondary" onclick="resetViewer()">원래대로</button>
+      <button class="success" id="penBtn" onclick="togglePen()">펜 켜기</button>
+      <button class="secondary" onclick="undoPen()">펜 되돌리기</button>
+      <button class="danger" onclick="clearPen()">펜 지우기</button>
+      <button onclick="savePen()">펜 저장</button>
+      <button class="danger" onclick="closeViewer()">닫기</button>
+    </div>
+    <div class="viewer-stage" id="viewerStage">
+      <div class="image-layer" id="imageLayer">
+        <img class="viewer-img" id="viewerImg" alt="전체화면 이미지">
+        <canvas class="draw-canvas" id="drawCanvas"></canvas>
+      </div>
+    </div>
+    <div class="hint" id="viewerHint">손가락 두 개로 확대/축소 가능. 펜을 켜면 이미지 위에 표시할 수 있습니다.</div>
+  </div>
+
   <div class="container">
     <header>
       <h1>AI 복습 자료 관리</h1>
-      <p>저장 직후 최근 저장 패널과 저장된 자료함에 새 카드가 즉시 표시됩니다.</p>
+      <p>이미지는 자동 압축 저장됩니다. 저장된 이미지 카드를 누르면 전체화면으로 보고 확대·축소와 펜 표시가 가능합니다.</p>
       <div class="status" id="pwaStatus">PWA 상태를 확인하는 중입니다.</div>
     </header>
 
@@ -141,13 +194,13 @@
         <div class="choice-grid">
           <label class="choice-box" for="galleryInput">
             <strong>이미지 선택</strong>
-            <p>앨범/파일에서 여러 장을 한 번에 선택합니다.</p>
+            <p>앨범/파일에서 여러 장을 한 번에 선택합니다. 저장 전 자동 압축됩니다.</p>
             <input type="file" id="galleryInput" accept="image/*" multiple />
           </label>
 
           <label class="choice-box" for="cameraInput">
             <strong>사진 촬영</strong>
-            <p>카메라로 한 장을 바로 촬영합니다.</p>
+            <p>카메라로 한 장을 바로 촬영합니다. 저장 전 자동 압축됩니다.</p>
             <input type="file" id="cameraInput" accept="image/*" capture="environment" />
           </label>
         </div>
@@ -160,7 +213,7 @@
         </div>
 
         <div class="action-row">
-          <button class="success" id="saveBtn" onclick="analyzeAndSaveAll()">OCR 분석 후 저장</button>
+          <button class="success" id="saveBtn" onclick="analyzeAndSaveAll()">압축 + OCR 분석 후 저장</button>
           <button class="danger" onclick="clearForm()">선택 초기화</button>
         </div>
 
@@ -244,9 +297,9 @@
   </div>
 
 <script>
-const STORAGE_KEY = "ai_review_pwa_materials_v4";
-const DONE_KEY = "ai_review_pwa_done_v4";
-const REMINDER_KEY = "ai_review_pwa_reminder_time_v4";
+const STORAGE_KEY = "ai_review_pwa_materials_v5";
+const DONE_KEY = "ai_review_pwa_done_v5";
+const REMINDER_KEY = "ai_review_pwa_reminder_time_v5";
 const reviewIntervals = [1, 3, 7, 14, 30];
 
 let selectedImages = [];
@@ -254,6 +307,17 @@ let materials = loadData(STORAGE_KEY, []);
 let doneLogs = loadData(DONE_KEY, []);
 let lastSavedIds = [];
 let reminderTimer = null;
+
+let currentViewerId = null;
+let viewerScale = 1;
+let viewerX = 0;
+let viewerY = 0;
+let penMode = false;
+let isDrawing = false;
+let penHistory = [];
+let activePointers = new Map();
+let lastPinchDistance = null;
+let lastPanPoint = null;
 
 document.getElementById("dateInput").value = todayString();
 document.getElementById("todayTitle").textContent = todayString() + " 오늘의 복습 파일";
@@ -277,7 +341,7 @@ function addFiles(fileList) {
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = event => {
-      selectedImages.push({ id: Date.now() + Math.random(), name: file.name || "촬영 이미지", image: event.target.result });
+      selectedImages.push({ id: Date.now() + Math.random(), name: file.name || "촬영 이미지", image: event.target.result, originalSize: file.size || 0 });
       loaded++;
       if (loaded === files.length) renderPreviews();
     };
@@ -294,6 +358,31 @@ function renderPreviews() {
         <p>${index + 1}. ${escapeHtml(item.name)}</p>
       </div>`).join("")
     : "";
+}
+
+function compressImage(dataUrl, maxWidth = 1200, quality = 0.62) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(1, maxWidth / img.width);
+      const width = Math.round(img.width * ratio);
+      const height = Math.round(img.height * ratio);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function dataUrlBytes(dataUrl) {
+  return Math.round((dataUrl.length * 3) / 4);
 }
 
 async function analyzeAndSaveAll() {
@@ -314,22 +403,30 @@ async function analyzeAndSaveAll() {
   analysisBox.style.display = "block";
   document.getElementById("savedPanel").style.display = "none";
   subjectResult.innerHTML = "";
-  progressText.textContent = "자료 저장을 시작합니다.";
+  progressText.textContent = "이미지 압축을 시작합니다.";
   progressBar.style.width = "0%";
 
   const titleBase = document.getElementById("titleInput").value.trim();
   const date = document.getElementById("dateInput").value || todayString();
   const newlySaved = [];
+  let totalBefore = 0;
+  let totalAfter = 0;
 
   try {
     for (let i = 0; i < selectedImages.length; i++) {
       const item = selectedImages[i];
+
+      progressText.textContent = `${i + 1}/${selectedImages.length}번째 이미지 압축 중...`;
+      const compressedImage = await compressImage(item.image, 1200, 0.62);
+      totalBefore += dataUrlBytes(item.image);
+      totalAfter += dataUrlBytes(compressedImage);
+
       progressText.textContent = `${i + 1}/${selectedImages.length}번째 이미지 OCR 분석 및 저장 중...`;
       progressBar.style.width = Math.round((i / selectedImages.length) * 100) + "%";
 
       let ocrText = "";
       try {
-        const result = await Tesseract.recognize(item.image, "kor+eng", {
+        const result = await Tesseract.recognize(compressedImage, "kor+eng", {
           logger: m => {
             if (m.progress) {
               const itemProgress = (i + m.progress) / selectedImages.length;
@@ -348,11 +445,13 @@ async function analyzeAndSaveAll() {
 
       const material = {
         id, title, date,
-        image: item.image,
+        image: compressedImage,
+        annotation: "",
         subject: analysis.subject,
         keywords: analysis.keywords,
         createdAt: new Date().toISOString(),
-        completedDates: []
+        completedDates: [],
+        compressed: true
       };
 
       materials.unshift(material);
@@ -363,21 +462,15 @@ async function analyzeAndSaveAll() {
     lastSavedIds = newlySaved.map(item => item.id);
     saveData();
 
-    if (loadData(STORAGE_KEY, []).length < materials.length) {
-      showToast("저장 확인 중 오류가 있습니다. 저장공간을 확인해 주세요.", false);
-    } else {
-      showSavedPanel(newlySaved);
-      showToast(`${newlySaved.length}개 자료가 저장되었습니다.`);
-    }
+    showSavedPanel(newlySaved, totalBefore, totalAfter);
+    showToast(`${newlySaved.length}개 자료가 압축 저장되었습니다.`);
 
     progressBar.style.width = "100%";
-    progressText.textContent = `${newlySaved.length}개 자료 저장 완료`;
+    progressText.textContent = `${newlySaved.length}개 자료 저장 완료: 약 ${formatBytes(totalBefore)} → ${formatBytes(totalAfter)}`;
     clearSelectionOnly();
     renderAll();
 
-    setTimeout(() => {
-      document.getElementById("archiveSection").scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 500);
+    setTimeout(() => document.getElementById("archiveSection").scrollIntoView({ behavior: "smooth", block: "start" }), 500);
 
   } catch (error) {
     console.error(error);
@@ -388,15 +481,15 @@ async function analyzeAndSaveAll() {
   }
 }
 
-function showSavedPanel(items) {
+function showSavedPanel(items, before, after) {
   const panel = document.getElementById("savedPanel");
   const summary = document.getElementById("savedSummary");
   const list = document.getElementById("recentSavedList");
 
   panel.style.display = "block";
-  summary.textContent = `${items.length}개 자료가 실제 저장되었습니다. 아래 카드와 저장된 자료함에서 확인할 수 있습니다.`;
+  summary.textContent = `${items.length}개 자료가 실제 저장되었습니다. 이미지 용량: 약 ${formatBytes(before)} → ${formatBytes(after)}로 압축되었습니다.`;
   list.innerHTML = items.map(item => `
-    <div class="saved-mini">
+    <div class="saved-mini" onclick="openViewer('${item.id}')">
       <img src="${item.image}" alt="저장 이미지">
       <p>${escapeHtml(item.title)}</p>
       <p class="saved-subject">${escapeHtml(item.subject)}</p>
@@ -457,7 +550,7 @@ function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(materials));
     localStorage.setItem(DONE_KEY, JSON.stringify(doneLogs));
   } catch (error) {
-    showToast("저장 공간이 부족합니다. 오래된 자료를 삭제해 주세요.", false);
+    showToast("저장 공간이 부족합니다. 이미지 수를 줄이거나 오래된 자료를 삭제해 주세요.", false);
     console.error(error);
   }
 }
@@ -522,15 +615,16 @@ function materialCard(m, completeButton=false) {
   const isNew = lastSavedIds.some(x => String(x) === String(m.id));
   return `
     <div class="material ${isNew ? "new-saved" : ""}">
-      <img src="${m.image}" alt="${escapeHtml(m.title)}">
+      <img src="${m.image}" alt="${escapeHtml(m.title)}" onclick="openViewer('${m.id}')">
       <div class="material-body">
         <h3>${escapeHtml(m.title)} ${isNew ? '<span class="badge">방금 저장</span>' : ''}</h3>
         <p><strong>과목:</strong> <span class="badge">${escapeHtml(m.subject)}</span></p>
         <p><strong>촬영 날짜:</strong> ${escapeHtml(m.date)}</p>
         <p><strong>다음 복습:</strong> ${escapeHtml(getNextReviewDate(m))}</p>
+        <p><strong>보기:</strong> 이미지를 누르면 전체화면으로 열립니다.</p>
         <div class="schedule"><strong>복습 주기</strong><br>${escapeHtml(dates)}</div>
         <div class="material-actions">
-          ${completeButton ? `<button class="success" onclick="completeToday('${m.id}')">오늘 복습 완료</button>` : `<button class="secondary" onclick="alert('저장된 과목: ${escapeHtml(m.subject)}')">과목 확인</button>`}
+          ${completeButton ? `<button class="success" onclick="completeToday('${m.id}')">오늘 복습 완료</button>` : `<button class="secondary" onclick="openViewer('${m.id}')">전체화면 보기</button>`}
           <button class="danger" onclick="deleteMaterial('${m.id}')">삭제</button>
         </div>
       </div>
@@ -598,6 +692,192 @@ function renderAll() {
   renderStats();
 }
 
+function openViewer(id) {
+  const material = materials.find(x => String(x.id) === String(id));
+  if (!material) return;
+  currentViewerId = material.id;
+  viewerScale = 1;
+  viewerX = 0;
+  viewerY = 0;
+  penMode = false;
+  penHistory = [];
+
+  document.getElementById("viewerTitle").textContent = material.title + " / " + material.subject;
+  document.getElementById("viewerImg").src = material.image;
+  document.getElementById("viewer").classList.add("show");
+  document.getElementById("viewer").classList.remove("pen-active");
+  document.getElementById("penBtn").textContent = "펜 켜기";
+  document.body.style.overflow = "hidden";
+
+  const img = document.getElementById("viewerImg");
+  img.onload = () => {
+    setupCanvas(material.annotation || "");
+    applyViewerTransform();
+  };
+}
+
+function closeViewer() {
+  document.getElementById("viewer").classList.remove("show");
+  document.body.style.overflow = "";
+  currentViewerId = null;
+}
+
+function applyViewerTransform() {
+  document.getElementById("imageLayer").style.transform = `translate(${viewerX}px, ${viewerY}px) scale(${viewerScale})`;
+}
+
+function zoomViewer(delta) {
+  viewerScale = Math.min(4, Math.max(0.5, viewerScale + delta));
+  applyViewerTransform();
+}
+
+function resetViewer() {
+  viewerScale = 1;
+  viewerX = 0;
+  viewerY = 0;
+  applyViewerTransform();
+}
+
+function togglePen() {
+  penMode = !penMode;
+  document.getElementById("viewer").classList.toggle("pen-active", penMode);
+  document.getElementById("penBtn").textContent = penMode ? "펜 끄기" : "펜 켜기";
+  document.getElementById("viewerHint").textContent = penMode ? "펜 모드입니다. 손가락 또는 애플펜슬로 표시하세요." : "손가락 두 개로 확대/축소 가능. 펜을 켜면 이미지 위에 표시할 수 있습니다.";
+}
+
+function setupCanvas(annotationData) {
+  const img = document.getElementById("viewerImg");
+  const canvas = document.getElementById("drawCanvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+
+  const ratio = img.clientWidth / canvas.width;
+  canvas.style.width = img.clientWidth + "px";
+  canvas.style.height = img.clientHeight + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (annotationData) {
+    const saved = new Image();
+    saved.onload = () => ctx.drawImage(saved, 0, 0, canvas.width, canvas.height);
+    saved.src = annotationData;
+  }
+}
+
+function getCanvasPoint(event) {
+  const canvas = document.getElementById("drawCanvas");
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * canvas.height
+  };
+}
+
+const stage = document.getElementById("viewerStage");
+const canvas = document.getElementById("drawCanvas");
+
+stage.addEventListener("pointerdown", e => {
+  if (!document.getElementById("viewer").classList.contains("show")) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  stage.setPointerCapture(e.pointerId);
+
+  if (penMode && e.target === canvas) {
+    isDrawing = true;
+    const ctx = canvas.getContext("2d");
+    penHistory.push(canvas.toDataURL("image/png"));
+    const p = getCanvasPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#ff3b30";
+  } else if (!penMode && activePointers.size === 1) {
+    lastPanPoint = { x: e.clientX, y: e.clientY };
+  }
+});
+
+stage.addEventListener("pointermove", e => {
+  if (!document.getElementById("viewer").classList.contains("show")) return;
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (penMode && isDrawing && e.target === canvas) {
+    const ctx = canvas.getContext("2d");
+    const p = getCanvasPoint(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    return;
+  }
+
+  if (!penMode) {
+    if (activePointers.size === 1 && lastPanPoint) {
+      viewerX += e.clientX - lastPanPoint.x;
+      viewerY += e.clientY - lastPanPoint.y;
+      lastPanPoint = { x: e.clientX, y: e.clientY };
+      applyViewerTransform();
+    }
+
+    if (activePointers.size === 2) {
+      const pts = Array.from(activePointers.values());
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (lastPinchDistance) {
+        const delta = (dist - lastPinchDistance) / 260;
+        viewerScale = Math.min(4, Math.max(0.5, viewerScale + delta));
+        applyViewerTransform();
+      }
+      lastPinchDistance = dist;
+    }
+  }
+});
+
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+
+function endPointer(e) {
+  activePointers.delete(e.pointerId);
+  isDrawing = false;
+  lastPinchDistance = null;
+  if (activePointers.size === 0) lastPanPoint = null;
+}
+
+function undoPen() {
+  const canvas = document.getElementById("drawCanvas");
+  const ctx = canvas.getContext("2d");
+  const last = penHistory.pop();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (last) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    img.src = last;
+  }
+}
+
+function clearPen() {
+  if (!confirm("펜 표시를 모두 지울까요?")) return;
+  const canvas = document.getElementById("drawCanvas");
+  penHistory.push(canvas.toDataURL("image/png"));
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function savePen() {
+  if (!currentViewerId) return;
+  const material = materials.find(x => String(x.id) === String(currentViewerId));
+  if (!material) return;
+  const canvas = document.getElementById("drawCanvas");
+  material.annotation = canvas.toDataURL("image/png");
+  saveData();
+  showToast("펜 표시가 저장되었습니다.");
+}
+
+window.addEventListener("resize", () => {
+  if (currentViewerId) {
+    const material = materials.find(x => String(x.id) === String(currentViewerId));
+    setupCanvas(material?.annotation || "");
+  }
+});
+
 function updatePwaStatus() {
   const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
   document.getElementById("pwaStatus").innerHTML = standalone
@@ -609,11 +889,7 @@ async function enableReminder() {
   const time = document.getElementById("reminderTime").value || "20:00";
   localStorage.setItem(REMINDER_KEY, time);
 
-  if (!("Notification" in window)) {
-    showToast("이 브라우저는 알림 기능을 지원하지 않습니다.", false);
-    return;
-  }
-
+  if (!("Notification" in window)) return showToast("이 브라우저는 알림 기능을 지원하지 않습니다.", false);
   const permission = await Notification.requestPermission();
   updateReminderStatus();
   scheduleReminderLoop();
@@ -659,6 +935,13 @@ function showNotification(title, body) {
   } else {
     new Notification(title, { body });
   }
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0KB";
+  const kb = bytes / 1024;
+  if (kb < 1024) return Math.round(kb) + "KB";
+  return (kb / 1024).toFixed(1) + "MB";
 }
 
 function escapeHtml(text) {
