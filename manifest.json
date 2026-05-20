@@ -1,7 +1,7 @@
 {
-  "name": "AI 복습 자료 관리",
-  "short_name": "AI복습",
-  "description": "OCR 기반 학습 자료 분류 및 망각곡선 복습 관리 앱",
+  "name": "AI 복습 자료 관리 V4",
+  "short_name": "AI복습V4",
+  "description": "OCR 기반 학습 자료 분류 및 망각곡선 복습 관리 앱 V4",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

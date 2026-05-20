@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "ai-review-pwa-compress-viewer-pen-v5";
+const CACHE_NAME = "ai-review-pwa-version4";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", event => {
