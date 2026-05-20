@@ -11,19 +11,18 @@
   <meta name="apple-mobile-web-app-title" content="AI복습" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
-
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif; }
     body {
       min-height: 100vh;
-      padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+      padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
       color: #f8fafc;
       background:
-        radial-gradient(circle at top left, rgba(37,99,235,.45), transparent 30%),
+        radial-gradient(circle at top left, rgba(37,99,235,.46), transparent 30%),
         radial-gradient(circle at top right, rgba(124,58,237,.42), transparent 30%),
-        linear-gradient(135deg, #020617, #0f172a 56%, #111827);
+        linear-gradient(135deg, #020617, #0f172a 58%, #111827);
     }
     .container { max-width: 1280px; margin: 0 auto; }
     header { text-align: center; margin-bottom: 20px; }
@@ -35,31 +34,46 @@
       -webkit-text-fill-color: transparent;
     }
     header p { color: #cbd5e1; line-height: 1.65; font-size: 14.5px; }
-    .pwa-status {
+    .status {
       margin: 14px auto 0; max-width: 900px; padding: 12px 14px; border-radius: 16px;
-      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #dbeafe; line-height: 1.55; font-size: 13.5px;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+      color: #dbeafe; line-height: 1.55; font-size: 13.5px;
     }
+    .toast {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-20px);
+      width: min(92vw, 520px); z-index: 9999; opacity: 0; pointer-events: none;
+      padding: 14px 16px; border-radius: 18px;
+      background: rgba(22, 163, 74, .94); color: white; font-weight: 800;
+      box-shadow: 0 18px 40px rgba(0,0,0,.35); transition: .25s;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 18px; align-items: start; }
     .card {
       background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.15); border-radius: 24px;
       padding: 20px; box-shadow: 0 24px 45px rgba(0,0,0,.24); backdrop-filter: blur(18px);
     }
     .card h2 { font-size: 19px; color: #e0f2fe; margin-bottom: 13px; }
-    .upload-box {
-      display: block; border: 2px dashed rgba(147,197,253,.65); border-radius: 20px; padding: 24px; text-align: center;
+    .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .choice-box {
+      display: block; border: 2px dashed rgba(147,197,253,.65); border-radius: 20px; padding: 22px; text-align: center;
       background: rgba(15,23,42,.62); cursor: pointer;
     }
-    .upload-box input { display: none; }
-    .upload-box p { color: #bfdbfe; margin-top: 8px; font-size: 14px; line-height: 1.5; }
-    .preview { margin-top: 14px; display: none; }
-    .preview img { width: 100%; max-height: 330px; object-fit: contain; border-radius: 18px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.18); }
+    .choice-box input { display: none; }
+    .choice-box p { color: #bfdbfe; margin-top: 8px; font-size: 13.5px; line-height: 1.5; }
+    .preview-grid, .mini-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 10px; margin-top: 14px; }
+    .preview-item, .saved-mini {
+      border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.2);
+    }
+    .preview-item img, .saved-mini img { width: 100%; height: 110px; object-fit: cover; display: block; }
+    .preview-item p, .saved-mini p { padding: 8px; color: #cbd5e1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .saved-mini .saved-subject { color:#bbf7d0; font-weight:900; }
     .form-grid, .action-row, .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .filters { grid-template-columns: 1.3fr .85fr .85fr; }
-    input, select, textarea {
+    input, select {
       width: 100%; padding: 12px 13px; border-radius: 14px; border: 1px solid rgba(255,255,255,.16);
       background: rgba(15,23,42,.78); color: #f8fafc; outline: none; font-size: 14px;
     }
-    textarea { margin-top: 12px; min-height: 130px; line-height: 1.55; resize: vertical; }
     button {
       border: none; border-radius: 14px; padding: 12px 14px; background: linear-gradient(135deg, #2563eb, #7c3aed);
       color: white; font-weight: 800; cursor: pointer;
@@ -68,14 +82,19 @@
     button.success { background: linear-gradient(135deg, #16a34a, #22c55e); }
     button.danger { background: linear-gradient(135deg, #dc2626, #fb7185); }
     button:disabled { opacity: .55; cursor: not-allowed; }
-    .progress-box, .analysis-box {
+    .progress-box, .analysis-box, .saved-panel {
       display: none; margin-top: 14px; padding: 15px; border-radius: 18px; background: rgba(15,23,42,.66);
       border: 1px solid rgba(255,255,255,.12);
     }
-    .progress-box p, .analysis-box p { color: #dbeafe; line-height: 1.65; margin-bottom: 8px; font-size: 14px; }
+    .progress-box p, .analysis-box p, .saved-panel p { color: #dbeafe; line-height: 1.65; margin-bottom: 8px; font-size: 14px; }
+    .saved-panel {
+      background: rgba(22, 163, 74, .13);
+      border: 1px solid rgba(74, 222, 128, .35);
+    }
+    .saved-panel h3 { color:#bbf7d0; font-size:16px; margin-bottom: 6px; }
     .bar { height: 10px; background: rgba(255,255,255,.12); border-radius: 999px; overflow: hidden; }
     .bar div { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width .2s; }
-    .badge { display: inline-block; padding: 6px 11px; border-radius: 999px; background: rgba(34,197,94,.18); border: 1px solid rgba(74,222,128,.45); color: #bbf7d0; font-weight: 900; }
+    .badge { display: inline-block; padding: 7px 12px; border-radius: 999px; background: rgba(34,197,94,.18); border: 1px solid rgba(74,222,128,.45); color: #bbf7d0; font-weight: 900; margin-right: 6px; margin-bottom: 6px; }
     .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }
     .stat { padding: 15px; border-radius: 18px; background: rgba(15,23,42,.66); border: 1px solid rgba(255,255,255,.12); }
     .stat strong { display: block; color: #93c5fd; font-size: 27px; margin-bottom: 4px; }
@@ -87,12 +106,12 @@
     .today-label { color:#fde68a; font-size:14px; }
     .list { display:grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap:14px; margin-top:14px; }
     .material { border-radius:20px; background:rgba(15,23,42,.72); border:1px solid rgba(255,255,255,.13); overflow:hidden; }
+    .material.new-saved { outline: 2px solid rgba(74,222,128,.8); box-shadow: 0 0 0 5px rgba(34,197,94,.12); }
     .material img { width:100%; height:170px; object-fit:cover; background:#020617; border-bottom:1px solid rgba(255,255,255,.1); }
     .material-body { padding:15px; }
     .material h3 { font-size:17px; margin-bottom:8px; }
     .material p { color:#cbd5e1; font-size:13.5px; line-height:1.58; margin-bottom:6px; }
-    .schedule, .text-preview { margin-top:9px; padding:10px; border-radius:12px; background:rgba(255,255,255,.07); color:#dbeafe; font-size:12.5px; line-height:1.6; }
-    .text-preview { background:rgba(2,6,23,.55); color:#cbd5e1; max-height:95px; overflow:auto; white-space:pre-wrap; }
+    .schedule { margin-top:9px; padding:10px; border-radius:12px; background:rgba(255,255,255,.07); color:#dbeafe; font-size:12.5px; line-height:1.6; }
     .material-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
     .empty { color:#94a3b8; padding:16px; border-radius:16px; background:rgba(15,23,42,.52); border:1px solid rgba(255,255,255,.1); line-height:1.6; grid-column:1/-1; }
     .subject-bars { margin-top:16px; }
@@ -100,57 +119,65 @@
     .subject-row p { display:flex; justify-content:space-between; color:#cbd5e1; font-size:13px; margin-bottom:6px; }
     @media (max-width: 900px) {
       body { padding: 13px; }
-      .grid, .form-grid, .action-row, .filters { grid-template-columns: 1fr; }
+      .grid, .form-grid, .action-row, .filters, .choice-grid { grid-template-columns: 1fr; }
       .card { padding: 17px; border-radius: 20px; }
     }
   </style>
 </head>
 
 <body>
+  <div class="toast" id="toast">저장 완료</div>
   <div class="container">
     <header>
       <h1>AI 복습 자료 관리</h1>
-      <p>홈화면에 설치해서 앱처럼 실행하고, OCR로 자료를 읽어 과목별로 분류하며, 망각곡선 복습 주기에 맞춰 오늘 복습할 자료를 모아 줍니다.</p>
-      <div class="pwa-status" id="pwaStatus">PWA 상태를 확인하는 중입니다.</div>
+      <p>저장 직후 최근 저장 패널과 저장된 자료함에 새 카드가 즉시 표시됩니다.</p>
+      <div class="status" id="pwaStatus">PWA 상태를 확인하는 중입니다.</div>
     </header>
 
     <main class="grid">
       <section class="card">
         <h2>① 자료 등록</h2>
-        <label class="upload-box" for="imageInput">
-          <strong>이미지 선택 또는 촬영</strong>
-          <p>아이패드에서 사진을 선택하거나 카메라로 촬영한 뒤 OCR 분석을 실행하세요.</p>
-          <input type="file" id="imageInput" accept="image/*" capture="environment" />
-        </label>
 
-        <div class="preview" id="preview"><img id="previewImage" alt="업로드 이미지"></div>
+        <div class="choice-grid">
+          <label class="choice-box" for="galleryInput">
+            <strong>이미지 선택</strong>
+            <p>앨범/파일에서 여러 장을 한 번에 선택합니다.</p>
+            <input type="file" id="galleryInput" accept="image/*" multiple />
+          </label>
+
+          <label class="choice-box" for="cameraInput">
+            <strong>사진 촬영</strong>
+            <p>카메라로 한 장을 바로 촬영합니다.</p>
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" />
+          </label>
+        </div>
+
+        <div class="preview-grid" id="previewGrid"></div>
 
         <div class="form-grid">
-          <input type="text" id="titleInput" placeholder="자료 제목 예: 영어 관계대명사 필기">
+          <input type="text" id="titleInput" placeholder="공통 제목 예: 영어 문법 복습">
           <input type="date" id="dateInput">
         </div>
 
         <div class="action-row">
-          <button id="ocrBtn" onclick="runOCR()">실제 OCR 실행</button>
-          <button class="secondary" onclick="classifyOnly()">텍스트 분석만</button>
+          <button class="success" id="saveBtn" onclick="analyzeAndSaveAll()">OCR 분석 후 저장</button>
+          <button class="danger" onclick="clearForm()">선택 초기화</button>
         </div>
 
         <div class="progress-box" id="progressBox">
-          <p id="progressText">OCR 준비 중</p>
+          <p id="progressText">준비 중</p>
           <div class="bar"><div id="progressBar"></div></div>
         </div>
 
-        <textarea id="ocrText" placeholder="OCR 인식 결과가 여기에 표시됩니다. 직접 수정해도 됩니다."></textarea>
-
         <div class="analysis-box" id="analysisBox">
-          <p><strong>분류 과목:</strong> <span class="badge" id="subjectResult">-</span></p>
-          <p><strong>핵심 단어:</strong> <span id="keywordResult">-</span></p>
-          <p id="reasonResult">분석 결과가 표시됩니다.</p>
+          <p><strong>분류된 과목:</strong></p>
+          <div id="subjectResult"></div>
         </div>
 
-        <div class="action-row">
-          <button class="success" onclick="saveMaterial()">자료 저장</button>
-          <button class="danger" onclick="clearForm()">입력 초기화</button>
+        <div class="saved-panel" id="savedPanel">
+          <h3>방금 저장된 자료</h3>
+          <p id="savedSummary"></p>
+          <div class="mini-list" id="recentSavedList"></div>
         </div>
       </section>
 
@@ -171,7 +198,6 @@
             <button class="secondary" onclick="testNotification()">알림 테스트</button>
           </div>
           <p id="reminderStatus">알림 시간이 아직 설정되지 않았습니다.</p>
-          <p>주의: 서버 없는 버전에서는 앱이 실행 중일 때만 정해진 시각 알림이 안정적으로 작동합니다. 앱을 완전히 닫아도 오는 진짜 푸시는 별도 서버가 필요합니다.</p>
         </div>
 
         <div class="subject-bars" id="subjectBars"></div>
@@ -185,13 +211,13 @@
         <div class="list" id="todayList"></div>
       </section>
 
-      <section class="card full">
+      <section class="card full" id="archiveSection">
         <div class="section-title">
           <h2>④ 저장된 자료함</h2>
           <button class="danger" onclick="resetAll()">전체 삭제</button>
         </div>
         <div class="filters">
-          <input type="text" id="searchInput" placeholder="검색: 제목, 과목, OCR 텍스트" oninput="renderAll()">
+          <input type="text" id="searchInput" placeholder="검색: 제목, 과목" oninput="renderAll()">
           <select id="subjectFilter" onchange="renderAll()">
             <option value="전체">전체 과목</option>
             <option value="국어">국어</option>
@@ -218,56 +244,207 @@
   </div>
 
 <script>
-const STORAGE_KEY = "ai_review_pwa_materials_v1";
-const DONE_KEY = "ai_review_pwa_done_v1";
-const REMINDER_KEY = "ai_review_pwa_reminder_time_v1";
+const STORAGE_KEY = "ai_review_pwa_materials_v4";
+const DONE_KEY = "ai_review_pwa_done_v4";
+const REMINDER_KEY = "ai_review_pwa_reminder_time_v4";
 const reviewIntervals = [1, 3, 7, 14, 30];
 
+let selectedImages = [];
 let materials = loadData(STORAGE_KEY, []);
 let doneLogs = loadData(DONE_KEY, []);
-let currentImageData = "";
-let currentAnalysis = null;
+let lastSavedIds = [];
 let reminderTimer = null;
 
 document.getElementById("dateInput").value = todayString();
 document.getElementById("todayTitle").textContent = todayString() + " 오늘의 복습 파일";
 document.getElementById("reminderTime").value = localStorage.getItem(REMINDER_KEY) || "20:00";
 
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then(() => updatePwaStatus()).catch(() => updatePwaStatus());
-} else {
-  updatePwaStatus();
-}
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").then(updatePwaStatus).catch(updatePwaStatus);
+else updatePwaStatus();
 
 updateReminderStatus();
 scheduleReminderLoop();
 renderAll();
 
-document.getElementById("imageInput").addEventListener("change", event => {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    currentImageData = e.target.result;
-    document.getElementById("previewImage").src = currentImageData;
-    document.getElementById("preview").style.display = "block";
-    if (!document.getElementById("titleInput").value.trim()) {
-      document.getElementById("titleInput").value = file.name.replace(/\.[^/.]+$/, "");
-    }
-  };
-  reader.readAsDataURL(file);
-});
+document.getElementById("galleryInput").addEventListener("change", e => addFiles(e.target.files));
+document.getElementById("cameraInput").addEventListener("change", e => addFiles(e.target.files));
 
-function updatePwaStatus() {
-  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-  const sw = "serviceWorker" in navigator;
-  const notification = "Notification" in window;
-  document.getElementById("pwaStatus").innerHTML =
-    standalone
-      ? "현재 홈화면 앱 모드로 실행 중입니다. Safari 주소창 없이 앱처럼 작동합니다."
-      : "Safari 공유 버튼 → 홈 화면에 추가를 누르면 앱 아이콘으로 설치할 수 있습니다. 설치 후 실행하면 전체화면 앱처럼 열립니다.";
-  if (!sw) document.getElementById("pwaStatus").innerHTML += "<br>이 브라우저는 Service Worker를 지원하지 않습니다.";
-  if (!notification) document.getElementById("pwaStatus").innerHTML += "<br>이 브라우저는 알림 기능을 지원하지 않습니다.";
+function addFiles(fileList) {
+  const files = Array.from(fileList || []).filter(file => file.type.startsWith("image/"));
+  if (!files.length) return;
+
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = event => {
+      selectedImages.push({ id: Date.now() + Math.random(), name: file.name || "촬영 이미지", image: event.target.result });
+      loaded++;
+      if (loaded === files.length) renderPreviews();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPreviews() {
+  const grid = document.getElementById("previewGrid");
+  grid.innerHTML = selectedImages.length
+    ? selectedImages.map((item, index) => `
+      <div class="preview-item">
+        <img src="${item.image}" alt="선택 이미지">
+        <p>${index + 1}. ${escapeHtml(item.name)}</p>
+      </div>`).join("")
+    : "";
+}
+
+async function analyzeAndSaveAll() {
+  const saveBtn = document.getElementById("saveBtn");
+  const progressBox = document.getElementById("progressBox");
+  const progressText = document.getElementById("progressText");
+  const progressBar = document.getElementById("progressBar");
+  const analysisBox = document.getElementById("analysisBox");
+  const subjectResult = document.getElementById("subjectResult");
+
+  if (!selectedImages.length) {
+    showToast("먼저 이미지를 선택하거나 촬영해 주세요.", false);
+    return;
+  }
+
+  saveBtn.disabled = true;
+  progressBox.style.display = "block";
+  analysisBox.style.display = "block";
+  document.getElementById("savedPanel").style.display = "none";
+  subjectResult.innerHTML = "";
+  progressText.textContent = "자료 저장을 시작합니다.";
+  progressBar.style.width = "0%";
+
+  const titleBase = document.getElementById("titleInput").value.trim();
+  const date = document.getElementById("dateInput").value || todayString();
+  const newlySaved = [];
+
+  try {
+    for (let i = 0; i < selectedImages.length; i++) {
+      const item = selectedImages[i];
+      progressText.textContent = `${i + 1}/${selectedImages.length}번째 이미지 OCR 분석 및 저장 중...`;
+      progressBar.style.width = Math.round((i / selectedImages.length) * 100) + "%";
+
+      let ocrText = "";
+      try {
+        const result = await Tesseract.recognize(item.image, "kor+eng", {
+          logger: m => {
+            if (m.progress) {
+              const itemProgress = (i + m.progress) / selectedImages.length;
+              progressBar.style.width = Math.round(itemProgress * 100) + "%";
+            }
+          }
+        });
+        ocrText = (result.data.text || "").trim();
+      } catch (ocrError) {
+        console.error(ocrError);
+      }
+
+      const analysis = analyzeText(titleBase + " " + item.name + " " + ocrText);
+      const title = selectedImages.length === 1 ? (titleBase || item.name || "복습 자료") : `${titleBase || "복습 자료"} ${i + 1}`;
+      const id = Date.now() + Math.random();
+
+      const material = {
+        id, title, date,
+        image: item.image,
+        subject: analysis.subject,
+        keywords: analysis.keywords,
+        createdAt: new Date().toISOString(),
+        completedDates: []
+      };
+
+      materials.unshift(material);
+      newlySaved.push(material);
+      subjectResult.innerHTML += `<span class="badge">${escapeHtml(title)} : ${escapeHtml(analysis.subject)}</span>`;
+    }
+
+    lastSavedIds = newlySaved.map(item => item.id);
+    saveData();
+
+    if (loadData(STORAGE_KEY, []).length < materials.length) {
+      showToast("저장 확인 중 오류가 있습니다. 저장공간을 확인해 주세요.", false);
+    } else {
+      showSavedPanel(newlySaved);
+      showToast(`${newlySaved.length}개 자료가 저장되었습니다.`);
+    }
+
+    progressBar.style.width = "100%";
+    progressText.textContent = `${newlySaved.length}개 자료 저장 완료`;
+    clearSelectionOnly();
+    renderAll();
+
+    setTimeout(() => {
+      document.getElementById("archiveSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 500);
+
+  } catch (error) {
+    console.error(error);
+    showToast("저장 중 오류가 발생했습니다.", false);
+    progressText.textContent = "저장 오류 발생";
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function showSavedPanel(items) {
+  const panel = document.getElementById("savedPanel");
+  const summary = document.getElementById("savedSummary");
+  const list = document.getElementById("recentSavedList");
+
+  panel.style.display = "block";
+  summary.textContent = `${items.length}개 자료가 실제 저장되었습니다. 아래 카드와 저장된 자료함에서 확인할 수 있습니다.`;
+  list.innerHTML = items.map(item => `
+    <div class="saved-mini">
+      <img src="${item.image}" alt="저장 이미지">
+      <p>${escapeHtml(item.title)}</p>
+      <p class="saved-subject">${escapeHtml(item.subject)}</p>
+    </div>
+  `).join("");
+}
+
+function showToast(message, success = true) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.style.background = success ? "rgba(22, 163, 74, .94)" : "rgba(220, 38, 38, .94)";
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function analyzeText(text) {
+  const combined = (text || "").toLowerCase();
+  const rules = [
+    { subject: "영어", words: ["grammar","relative","pronoun","vocabulary","reading","passage","영어","문법","독해","단어","해석","관계대명사","to부정사","분사"] },
+    { subject: "수학", words: ["수학","행렬","함수","미분","적분","방정식","그래프","확률","통계","matrix","function","equation","calculus"] },
+    { subject: "과학", words: ["과학","물리","화학","생명","지구","산화","환원","원자","분자","세포","에너지","실험","oxidation","reduction"] },
+    { subject: "사회", words: ["사회","역사","정치","경제","지리","민주주의","독재","시장","헌법","culture","history","economy"] },
+    { subject: "국어", words: ["국어","문학","소설","시","작가","화자","주제","서술자","비유","작품"] }
+  ];
+  let best = { subject: "기타", score: 0, matched: [] };
+  for (const rule of rules) {
+    const matched = rule.words.filter(w => combined.includes(w.toLowerCase()));
+    if (matched.length > best.score) best = { subject: rule.subject, score: matched.length, matched };
+  }
+  return { subject: best.subject, keywords: best.matched.slice(0, 8) };
+}
+
+function clearSelectionOnly() {
+  document.getElementById("galleryInput").value = "";
+  document.getElementById("cameraInput").value = "";
+  document.getElementById("titleInput").value = "";
+  document.getElementById("dateInput").value = todayString();
+  selectedImages = [];
+  renderPreviews();
+}
+
+function clearForm() {
+  clearSelectionOnly();
+  document.getElementById("progressBox").style.display = "none";
+  document.getElementById("analysisBox").style.display = "none";
+  document.getElementById("savedPanel").style.display = "none";
+  document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("subjectResult").innerHTML = "";
 }
 
 function loadData(key, fallback) {
@@ -276,8 +453,13 @@ function loadData(key, fallback) {
 }
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(materials));
-  localStorage.setItem(DONE_KEY, JSON.stringify(doneLogs));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(materials));
+    localStorage.setItem(DONE_KEY, JSON.stringify(doneLogs));
+  } catch (error) {
+    showToast("저장 공간이 부족합니다. 오래된 자료를 삭제해 주세요.", false);
+    console.error(error);
+  }
 }
 
 function todayString() {
@@ -296,141 +478,31 @@ function getReviewDates(dateString) {
   return reviewIntervals.map(days => addDays(dateString, days));
 }
 
-async function runOCR() {
-  if (!currentImageData) {
-    alert("먼저 이미지를 선택해 주세요.");
-    return;
-  }
-
-  const progressBox = document.getElementById("progressBox");
-  const progressText = document.getElementById("progressText");
-  const progressBar = document.getElementById("progressBar");
-  const ocrBtn = document.getElementById("ocrBtn");
-
-  progressBox.style.display = "block";
-  progressText.textContent = "OCR 엔진을 준비하고 있습니다.";
-  progressBar.style.width = "5%";
-  ocrBtn.disabled = true;
-
-  try {
-    const result = await Tesseract.recognize(currentImageData, "kor+eng", {
-      logger: m => {
-        const pct = m.progress ? Math.round(m.progress * 100) : 0;
-        if (m.status) {
-          progressText.textContent = "OCR 진행 중: " + m.status + " " + pct + "%";
-          progressBar.style.width = Math.max(5, pct) + "%";
-        }
-      }
-    });
-    document.getElementById("ocrText").value = result.data.text.trim() || "인식된 텍스트가 없습니다. 사진을 더 밝고 선명하게 다시 찍어 보세요.";
-    progressText.textContent = "OCR 인식 완료";
-    progressBar.style.width = "100%";
-    analyzeText();
-  } catch (e) {
-    console.error(e);
-    progressText.textContent = "OCR 오류가 발생했습니다. 인터넷 연결을 확인해 주세요.";
-  } finally {
-    ocrBtn.disabled = false;
-  }
-}
-
-function classifyOnly() { analyzeText(); }
-
-function analyzeText() {
-  const title = document.getElementById("titleInput").value.trim();
-  const text = document.getElementById("ocrText").value.trim();
-  const combined = (title + " " + text).toLowerCase();
-
-  const rules = [
-    { subject: "영어", words: ["grammar","relative","pronoun","vocabulary","reading","passage","영어","문법","독해","단어","해석","관계대명사","to부정사","분사"] },
-    { subject: "수학", words: ["수학","행렬","함수","미분","적분","방정식","그래프","확률","통계","matrix","function","equation","calculus"] },
-    { subject: "과학", words: ["과학","물리","화학","생명","지구","산화","환원","원자","분자","세포","에너지","실험","oxidation","reduction"] },
-    { subject: "사회", words: ["사회","역사","정치","경제","지리","민주주의","독재","시장","헌법","culture","history","economy"] },
-    { subject: "국어", words: ["국어","문학","소설","시","작가","화자","주제","서술자","비유","작품"] }
-  ];
-
-  let best = { subject: "기타", score: 0, matched: [] };
-  for (const rule of rules) {
-    const matched = rule.words.filter(w => combined.includes(w.toLowerCase()));
-    if (matched.length > best.score) best = { subject: rule.subject, score: matched.length, matched };
-  }
-
-  const keywords = best.matched.length ? best.matched.slice(0, 8) : extractKeywords(text || title);
-  currentAnalysis = {
-    subject: best.subject,
-    keywords,
-    reason: best.subject === "기타"
-      ? "명확한 과목 단서가 부족하여 기타 자료로 분류했습니다. OCR 텍스트를 직접 수정하면 정확도를 높일 수 있습니다."
-      : "OCR 텍스트에서 '" + keywords.join(", ") + "' 등이 감지되어 " + best.subject + " 자료로 분류했습니다."
-  };
-
-  document.getElementById("subjectResult").textContent = currentAnalysis.subject;
-  document.getElementById("keywordResult").textContent = keywords.join(", ") || "-";
-  document.getElementById("reasonResult").textContent = currentAnalysis.reason;
-  document.getElementById("analysisBox").style.display = "block";
-  return currentAnalysis;
-}
-
-function extractKeywords(text) {
-  return text.replace(/[^\w가-힣\s]/g, " ").split(/\s+/).filter(w => w.length >= 2).slice(0, 8);
-}
-
-function saveMaterial() {
-  const title = document.getElementById("titleInput").value.trim() || "제목 없는 자료";
-  const date = document.getElementById("dateInput").value || todayString();
-  const ocrText = document.getElementById("ocrText").value.trim();
-
-  if (!currentImageData) return alert("이미지를 먼저 선택해 주세요.");
-  if (!currentAnalysis) currentAnalysis = analyzeText();
-
-  materials.unshift({
-    id: Date.now(),
-    title, date,
-    image: currentImageData,
-    ocrText,
-    subject: currentAnalysis.subject,
-    keywords: currentAnalysis.keywords,
-    createdAt: new Date().toISOString(),
-    completedDates: []
-  });
-  saveData();
-  clearForm();
-  renderAll();
-  alert("자료가 저장되었습니다.");
-}
-
-function clearForm() {
-  document.getElementById("imageInput").value = "";
-  document.getElementById("titleInput").value = "";
-  document.getElementById("dateInput").value = todayString();
-  document.getElementById("ocrText").value = "";
-  document.getElementById("preview").style.display = "none";
-  document.getElementById("analysisBox").style.display = "none";
-  document.getElementById("progressBox").style.display = "none";
-  document.getElementById("progressBar").style.width = "0%";
-  currentImageData = "";
-  currentAnalysis = null;
-}
-
 function isDueToday(material) {
   const today = todayString();
   return getReviewDates(material.date).includes(today) && !(material.completedDates || []).includes(today);
 }
 
+function getNextReviewDate(material) {
+  const today = todayString();
+  return getReviewDates(material.date).find(d => d >= today && !(material.completedDates || []).includes(d)) || "기본 복습 완료";
+}
+
 function completeToday(id) {
-  const material = materials.find(x => x.id === id);
+  const material = materials.find(x => String(x.id) === String(id));
   if (!material) return;
   const today = todayString();
   if (!material.completedDates.includes(today)) material.completedDates.push(today);
-  doneLogs.unshift({ id: Date.now(), materialId: id, title: material.title, subject: material.subject, doneDate: today });
+  doneLogs.unshift({ id: Date.now() + Math.random(), materialId: material.id, title: material.title, subject: material.subject, doneDate: today });
   saveData();
   renderAll();
 }
 
 function deleteMaterial(id) {
   if (!confirm("이 자료를 삭제할까요?")) return;
-  materials = materials.filter(x => x.id !== id);
-  doneLogs = doneLogs.filter(x => x.materialId !== id);
+  materials = materials.filter(x => String(x.id) !== String(id));
+  doneLogs = doneLogs.filter(x => String(x.materialId) !== String(id));
+  lastSavedIds = lastSavedIds.filter(x => String(x) !== String(id));
   saveData();
   renderAll();
 }
@@ -439,41 +511,31 @@ function resetAll() {
   if (!confirm("모든 자료와 복습 기록을 삭제할까요?")) return;
   materials = [];
   doneLogs = [];
+  lastSavedIds = [];
   saveData();
   renderAll();
-}
-
-function getNextReviewDate(material) {
-  const today = todayString();
-  return getReviewDates(material.date).find(d => d >= today && !(material.completedDates || []).includes(d)) || "기본 복습 완료";
+  document.getElementById("savedPanel").style.display = "none";
 }
 
 function materialCard(m, completeButton=false) {
   const dates = getReviewDates(m.date).map(d => (m.completedDates || []).includes(d) ? d + " 완료" : d).join(" / ");
+  const isNew = lastSavedIds.some(x => String(x) === String(m.id));
   return `
-    <div class="material">
+    <div class="material ${isNew ? "new-saved" : ""}">
       <img src="${m.image}" alt="${escapeHtml(m.title)}">
       <div class="material-body">
-        <h3>${escapeHtml(m.title)}</h3>
-        <p><strong>과목:</strong> ${escapeHtml(m.subject)}</p>
+        <h3>${escapeHtml(m.title)} ${isNew ? '<span class="badge">방금 저장</span>' : ''}</h3>
+        <p><strong>과목:</strong> <span class="badge">${escapeHtml(m.subject)}</span></p>
         <p><strong>촬영 날짜:</strong> ${escapeHtml(m.date)}</p>
         <p><strong>다음 복습:</strong> ${escapeHtml(getNextReviewDate(m))}</p>
-        <p><strong>핵심 단어:</strong> ${escapeHtml((m.keywords || []).join(", "))}</p>
         <div class="schedule"><strong>복습 주기</strong><br>${escapeHtml(dates)}</div>
-        <div class="text-preview">${escapeHtml((m.ocrText || "저장된 OCR 텍스트 없음").slice(0, 500))}</div>
         <div class="material-actions">
-          ${completeButton ? `<button class="success" onclick="completeToday(${m.id})">오늘 복습 완료</button>` : `<button class="secondary" onclick="copyText(${m.id})">텍스트 복사</button>`}
-          <button class="danger" onclick="deleteMaterial(${m.id})">삭제</button>
+          ${completeButton ? `<button class="success" onclick="completeToday('${m.id}')">오늘 복습 완료</button>` : `<button class="secondary" onclick="alert('저장된 과목: ${escapeHtml(m.subject)}')">과목 확인</button>`}
+          <button class="danger" onclick="deleteMaterial('${m.id}')">삭제</button>
         </div>
       </div>
     </div>
   `;
-}
-
-function copyText(id) {
-  const m = materials.find(x => x.id === id);
-  if (!m) return;
-  navigator.clipboard.writeText(m.ocrText || "").then(() => alert("OCR 텍스트를 복사했습니다."));
 }
 
 function renderToday() {
@@ -489,7 +551,7 @@ function renderArchive() {
   const sort = document.getElementById("sortFilter").value;
 
   let filtered = materials.filter(m => {
-    const target = [m.title, m.subject, m.ocrText, (m.keywords || []).join(" ")].join(" ").toLowerCase();
+    const target = [m.title, m.subject, (m.keywords || []).join(" ")].join(" ").toLowerCase();
     return (!search || target.includes(search)) && (subject === "전체" || m.subject === subject);
   });
 
@@ -507,7 +569,7 @@ function renderDone() {
     ? doneLogs.slice(0, 15).map(log => `
       <div class="material"><div class="material-body">
         <h3>${escapeHtml(log.title)}</h3>
-        <p><strong>과목:</strong> ${escapeHtml(log.subject)}</p>
+        <p><strong>과목:</strong> <span class="badge">${escapeHtml(log.subject)}</span></p>
         <p><strong>완료 날짜:</strong> ${escapeHtml(log.doneDate)}</p>
       </div></div>`).join("")
     : `<div class="empty">아직 복습 완료 기록이 없습니다.</div>`;
@@ -536,12 +598,19 @@ function renderAll() {
   renderStats();
 }
 
+function updatePwaStatus() {
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+  document.getElementById("pwaStatus").innerHTML = standalone
+    ? "현재 홈화면 앱 모드로 실행 중입니다. Safari 주소창 없이 앱처럼 작동합니다."
+    : "Safari 공유 버튼 → 홈 화면에 추가를 누르면 앱 아이콘으로 설치할 수 있습니다.";
+}
+
 async function enableReminder() {
   const time = document.getElementById("reminderTime").value || "20:00";
   localStorage.setItem(REMINDER_KEY, time);
 
   if (!("Notification" in window)) {
-    alert("이 브라우저는 알림 기능을 지원하지 않습니다.");
+    showToast("이 브라우저는 알림 기능을 지원하지 않습니다.", false);
     return;
   }
 
@@ -549,41 +618,30 @@ async function enableReminder() {
   updateReminderStatus();
   scheduleReminderLoop();
 
-  if (permission === "granted") {
-    showNotification("복습 알림 설정 완료", "매일 " + time + "에 앱이 실행 중이면 복습 알림을 보냅니다.");
-  } else {
-    alert("알림 권한이 허용되지 않았습니다.");
-  }
+  if (permission === "granted") showNotification("복습 알림 설정 완료", "매일 " + time + "에 앱이 실행 중이면 복습 알림을 보냅니다.");
+  else showToast("알림 권한이 허용되지 않았습니다.", false);
 }
 
 function updateReminderStatus() {
   const time = localStorage.getItem(REMINDER_KEY);
-  document.getElementById("reminderStatus").textContent = time
-    ? "현재 설정된 복습 알림 시간: " + time
-    : "알림 시간이 아직 설정되지 않았습니다.";
+  document.getElementById("reminderStatus").textContent = time ? "현재 설정된 복습 알림 시간: " + time : "알림 시간이 아직 설정되지 않았습니다.";
 }
 
 function scheduleReminderLoop() {
   if (reminderTimer) clearTimeout(reminderTimer);
   const time = localStorage.getItem(REMINDER_KEY);
   if (!time) return;
-
   const [h, m] = time.split(":").map(Number);
   const now = new Date();
   const next = new Date();
   next.setHours(h, m, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
 
-  const delay = next - now;
   reminderTimer = setTimeout(() => {
     const count = materials.filter(isDueToday).length;
-    if (count > 0) {
-      showNotification("오늘 복습할 자료가 있습니다", count + "개의 복습 자료를 확인하세요.");
-    } else {
-      showNotification("오늘의 복습 확인", "오늘 복습할 자료가 있는지 확인해 보세요.");
-    }
+    showNotification(count > 0 ? "오늘 복습할 자료가 있습니다" : "오늘의 복습 확인", count > 0 ? count + "개의 복습 자료를 확인하세요." : "오늘 복습할 자료가 있는지 확인해 보세요.");
     scheduleReminderLoop();
-  }, delay);
+  }, next - now);
 }
 
 function testNotification() {
@@ -591,8 +649,8 @@ function testNotification() {
 }
 
 function showNotification(title, body) {
-  if (!("Notification" in window)) return alert("알림을 지원하지 않는 브라우저입니다.");
-  if (Notification.permission !== "granted") return alert("먼저 알림 권한을 허용해 주세요.");
+  if (!("Notification" in window)) return showToast("알림을 지원하지 않는 브라우저입니다.", false);
+  if (Notification.permission !== "granted") return showToast("먼저 알림 권한을 허용해 주세요.", false);
 
   if (navigator.serviceWorker && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION", title, body });
